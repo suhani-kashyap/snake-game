@@ -24,9 +24,6 @@ def show_dir():
 display_width = 400
 display_height = 300
 
-# Create a VideoCapture object
-cap = cv2.VideoCapture(0)  # 0 for the default camera, you can change this number for other cameras
-
 pygame.init()
 display = pygame.display.set_mode((display_width, display_height))
 
@@ -40,34 +37,41 @@ red=(255,0,0)
 black=(0,0,0)
 
 snake_block = 10
-snake_speed = 15
-snake_position = [display_width, display_height]
-snake_body = [[display_width, display_height]]
+snake_speed = 5
+snake_position = [display_width/2, display_height/2]
+snake_body = [[display_width/2, display_height/2]]
 fruit_eaten = False
 
 foodx = round(random.randrange(0, display_width - snake_block) / 10.0) * 10.0
-foody = round(random.randrange(0, display_width - snake_block) / 10.0) * 10.0
+foody = round(random.randrange(0, display_height - snake_block) / 10.0) * 10.0
 
-firstTime = True
 game_over = False
+direction = "UP"
+changeTo = "UP"
 while not game_over:
     for event in pygame.event.get():
         #If we close the game then set game_over to be true
         if event.type == pygame.QUIT:
             game_over = True
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_UP:
+                changeTo = "UP"
+            if event.key == pygame.K_DOWN:
+                changeTo = "DOWN"
+            if event.key == pygame.K_LEFT:
+                changeTo = "LEFT"
+            if event.key == pygame.K_RIGHT:
+                changeTo = "RIGHT"
 
-    changeTo = show_dir()
-    if firstTime:
-        direction = changeTo
-    else:
-        if changeTo == "UP" and direction != "DOWN":
-            direction = "UP"
-        if changeTo == "DOWN" and direction != "UP":
-            direction = "DOWN"
-        if changeTo == "LEFT" and direction != "RIGHT":
-            direction = "LEFT"
-        if changeTo == "RIGHT" and direction != "LEFT":
-            direction = "RIGHT"
+
+    if changeTo == "UP" and direction != "DOWN":
+        direction = "UP"
+    if changeTo == "DOWN" and direction != "UP":
+        direction = "DOWN"
+    if changeTo == "LEFT" and direction != "RIGHT":
+        direction = "LEFT"
+    if changeTo == "RIGHT" and direction != "LEFT":
+        direction = "RIGHT"
 
     if direction == "UP":
         snake_position[1] -= 10
@@ -88,11 +92,10 @@ while not game_over:
 
     if fruit_eaten:
         foodx = round(random.randrange(0, display_width - snake_block) / 10.0) * 10.0
-        foody = round(random.randrange(0, display_width - snake_block) / 10.0) * 10.0
+        foody = round(random.randrange(0, display_height - snake_block) / 10.0) * 10.0
         fruit_eaten = False
 
     display.fill(black)
-
 
     # Draws the snake
     for part in snake_body:
@@ -113,27 +116,7 @@ while not game_over:
 
     show_score(display)
     pygame.display.update()
-
-    # Loop to continuously capture frames from the camera
-    while cap.isOpened():
-        # Capture frame-by-frame
-        ret, frame = cap.read()
-
-        # Check if the frame was successfully captured
-        if not ret:
-            print("Error: Could not read frame.")
-            break
-
-        # Display the frame
-        cv2.imshow('Camera Feed', frame)
-
-        # Break the loop on pressing 'q'
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    # Release the VideoCapture object and close the OpenCV window
-    cap.release()
-    cv2.destroyAllWindows()
+    fps.tick(snake_speed)
 
 pygame.quit()
 quit()
