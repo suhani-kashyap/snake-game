@@ -1,25 +1,77 @@
 import pygame
 import cv2
-import numpy as np
 import random
-import mediapipe as mp
 
+
+###################################
+#         INIT CAMERA             #
+###################################
+# capture video using default camera
+cap = cv2.VideoCapture(0)
+
+# init tracker
+tracker = cv2.legacy.TrackerMOSSE_create()
+
+# init stack to store last location of oject
+rect_stack = []
+directions = {"RIGHT": 0, "LEFT": 0, "UP": 0, "DOWN": 0}
+
+success, img = cap.read()
+bounding_box = cv2.selectROI("Tracking",img,False)
+
+rect_stack.append(bounding_box)
+
+tracker.init(img,bounding_box)
+
+def drawBox(img, bounding_box):
+    x, y, w, h = int(bounding_box[0]), int(bounding_box[1]), int(bounding_box[2]), int(bounding_box[3])
+    cv2.rectangle(img, (x, y), ((x+w), (y+h)), (255, 0, 255), 3, 1)
+
+    bb = rect_stack.pop(-1)
+    x_prev, y_prev, w_prev, h_prev = int(bb[0]), int(bb[1]), int(bb[2]), int(bb[3])
+
+    rect_stack.append(bounding_box)
+
+    center_prev_x, center_prev_y = (x_prev + w_prev)/2, (y_prev + h_prev)/2
+    center_curr_x, center_curr_y = (x+w)/2, (y+h)/2
+
+    x_diff = int(abs(center_prev_x - center_curr_x))
+    y_diff = int(abs(center_prev_y - center_curr_y))
+
+    direction = ""
+    if x_diff >= y_diff:
+        if center_curr_x >= center_prev_x:
+            directions["LEFT"] += 1
+        else:
+            directions["RIGHT"] += 1
+    else:
+        if center_curr_y >= center_prev_y:
+            directions["DOWN"] += 1
+        else:
+            directions["UP"] += 1
+
+    cv2.putText(img, "Tracking", (75, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+
+def find_max_direction(directions):
+    max_direction = ""
+    directions_list = list(directions.keys())
+    max_num = 0
+
+    for direction in directions_list:
+        if max_num < directions[direction]:
+            max_num = directions[direction]
+            max_direction = direction
+
+    directions = {"RIGHT": 0, "LEFT": 0, "UP": 0, "DOWN": 0}
+
+    return (max_direction, directions)
+
+
+###################################
+#          INIT GAME              #
+###################################
 score = 0
-
-def show_score(display):
-    score_font = pygame.font.SysFont("Arial", 15)
-    score_surface = score_font.render('Score : ' + str(score), True, "White")
-
-    # create a rectangular object for the
-    # text surface object
-    score_rect = score_surface.get_rect()
-
-    # displaying text
-    display.blit(score_surface, score_rect)
-
-def show_dir():
-    dir_list = ["UP", "DOWN", "RIGHT", "LEFT"]
-    return random.choice(dir_list)
 
 display_width = 400
 display_height = 300
@@ -37,7 +89,7 @@ red=(255,0,0)
 black=(0,0,0)
 
 snake_block = 10
-snake_speed = 5
+snake_speed = 1
 snake_position = [display_width/2, display_height/2]
 snake_body = [[display_width/2, display_height/2]]
 fruit_eaten = False
@@ -48,21 +100,43 @@ foody = round(random.randrange(0, display_height - snake_block) / 10.0) * 10.0
 game_over = False
 direction = "UP"
 changeTo = "UP"
-while not game_over:
-    for event in pygame.event.get():
-        #If we close the game then set game_over to be true
-        if event.type == pygame.QUIT:
-            game_over = True
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
-                changeTo = "UP"
-            if event.key == pygame.K_DOWN:
-                changeTo = "DOWN"
-            if event.key == pygame.K_LEFT:
-                changeTo = "LEFT"
-            if event.key == pygame.K_RIGHT:
-                changeTo = "RIGHT"
 
+Clock = pygame.time.Clock()
+
+def show_score(display):
+    score_font = pygame.font.SysFont("Arial", 15)
+    score_surface = score_font.render('Score : ' + str(score), True, "White")
+
+    # create a rectangular object for the
+    # text surface object
+    score_rect = score_surface.get_rect()
+
+    # displaying text
+    display.blit(score_surface, score_rect)
+
+
+
+def show_dir():
+    dir_list = ["UP", "DOWN", "RIGHT", "LEFT"]
+    return random.choice(dir_list)
+
+
+while not game_over:
+    success, img = cap.read()
+    success, bounding_box = tracker.update(img)
+
+    i = 0
+    while i < 60:
+        success, img = cap.read()
+        success, bounding_box = tracker.update(img)
+        i += 1
+
+        if success:
+            changeTo = drawBox(img, bounding_box)
+        else:
+            cv2.putText(img, "Lost", (75, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+    changeTo, directions = find_max_direction(directions)
 
     if changeTo == "UP" and direction != "DOWN":
         direction = "UP"
@@ -117,6 +191,15 @@ while not game_over:
     show_score(display)
     pygame.display.update()
     fps.tick(snake_speed)
+
+    # Show Camera window
+    cv2.imshow("Tracking", img)
+
+    Clock.tick(60)
+
+    # check for pressing q
+    if cv2.waitKey(1) & 0xff == ord('q'):
+        break
 
 pygame.quit()
 quit()
